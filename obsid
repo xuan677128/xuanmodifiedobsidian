@@ -1,0 +1,471 @@
+local OBSIDIAN_URL = "https://raw.githubusercontent.com/deividcomsono/Obsidian/main/Library.lua"
+local THEME_URL = "https://raw.githubusercontent.com/deividcomsono/Obsidian/main/addons/ThemeManager.lua"
+local SAVE_URL = "https://raw.githubusercontent.com/deividcomsono/Obsidian/main/addons/SaveManager.lua"
+local XUAN_ICON_ASSET = 108980322155893
+
+local Players = game:GetService("Players")
+local player = Players.LocalPlayer or Players.PlayerAdded:Wait()
+
+local function loadModifiedLibrary()
+    local playerGui = player:WaitForChild("PlayerGui")
+    local source = game:HttpGet(OBSIDIAN_URL)
+
+    source = source:gsub(
+        'gethui%s*%([^%)]*%)',
+        'game:GetService("Players").LocalPlayer:WaitForChild("PlayerGui")'
+    )
+    source = source:gsub(
+        'gethui%s*%b()',
+        'game:GetService("Players").LocalPlayer:WaitForChild("PlayerGui")'
+    )
+    source = source:gsub(
+        'local%s+gethui%s*=%s*gethui%s+or%s+function%s*%(%s*%)%s*return%s+CoreGui%s*end',
+        'local gethui = gethui or function() return game:GetService("Players").LocalPlayer:WaitForChild("PlayerGui") end'
+    )
+
+    local oldGetHui = gethui
+    local oldProtectGui = protectgui
+    local oldSynProtectGui = syn and syn.protect_gui
+
+    if getgenv then
+        getgenv().gethui = function()
+            return player:WaitForChild("PlayerGui")
+        end
+        getgenv().protectgui = function() end
+        if syn then
+            syn.protect_gui = function() end
+        end
+    end
+
+    local libraryFunc = assert(loadstring(source), "XUAN Obsidian loadstring failed")
+    local Library = libraryFunc()
+
+    if getgenv then
+        getgenv().gethui = oldGetHui
+        getgenv().protectgui = oldProtectGui
+        if syn then
+            syn.protect_gui = oldSynProtectGui
+        end
+    end
+
+    if Library.ScreenGui and Library.ScreenGui.Parent ~= playerGui then
+        Library.ScreenGui.Parent = playerGui
+    end
+    return Library
+end
+
+local function addRegistry(Library, instance, properties)
+    if type(Library.AddToRegistry) == "function" then
+        Library:AddToRegistry(instance, properties)
+    end
+end
+
+local XUAN_TAB_DESCRIPTIONS = {
+    Home = "Home dashboard",
+    Main = "Main features",
+    Planting = "Planting features",
+    ["Moon Prediction"] = "Moon prediction tools",
+    Method = "Method features",
+    ["Paid Features"] = "Paid features",
+    Shop = "Shop features",
+    ESP = "ESP features",
+    Settings = "Settings and utilities",
+}
+local XUAN_HEADER_TITLE_WIDTH = 0.36
+local XUAN_HEADER_RIGHT_WIDTH = 0.53
+
+local function applyXuanWindowStyle(Library, Window)
+    local header = {}
+
+    local function tabDescription(name)
+        name = tostring(name or "Main")
+        return XUAN_TAB_DESCRIPTIONS[name] or (name .. " features")
+    end
+
+    local function findWindowHeader()
+        if header.TopBar and header.TopBar.Parent then
+            return true
+        end
+
+        local screenGui = Library.ScreenGui
+        local mainFrame = screenGui and screenGui:FindFirstChild("Main", true)
+        if not mainFrame then
+            return false
+        end
+
+        local divider
+        for _, child in ipairs(mainFrame:GetChildren()) do
+            if child:IsA("Frame")
+                and child.Size.X.Scale == 0 and child.Size.X.Offset == 1
+                and child.Size.Y.Scale == 1 and child.Size.Y.Offset == -21 then
+                divider = child
+                break
+            end
+        end
+
+        local topBar
+        for _, child in ipairs(mainFrame:GetChildren()) do
+            if child:IsA("Frame")
+                and child.Size.X.Scale == 1 and child.Size.X.Offset == 0
+                and child.Size.Y.Scale == 0 and child.Size.Y.Offset == 48
+                and child.Position.X.Scale == 0 and child.Position.X.Offset == 0
+                and child.Position.Y.Scale == 0 and child.Position.Y.Offset == 0 then
+                topBar = child
+                break
+            end
+        end
+        if not topBar then
+            return false
+        end
+        topBar.Name = "XuanWindowTopBar"
+
+        local titleHolder
+        for _, child in ipairs(topBar:GetChildren()) do
+            if child:IsA("Frame")
+                and child.Size.X.Scale == 0
+                and child.Size.Y.Scale == 1
+                and child:FindFirstChildOfClass("UIListLayout") then
+                titleHolder = child
+                break
+            end
+        end
+        if not titleHolder then
+            return false
+        end
+        titleHolder.Name = "XuanWindowTitleHolder"
+
+        local title
+        for _, child in ipairs(titleHolder:GetChildren()) do
+            if child:IsA("TextLabel") then
+                title = child
+                break
+            end
+        end
+        if not title then
+            return false
+        end
+
+        local titleLayout = titleHolder:FindFirstChildOfClass("UIListLayout")
+        if titleLayout then
+            titleLayout.FillDirection = Enum.FillDirection.Vertical
+            titleLayout.HorizontalAlignment = Enum.HorizontalAlignment.Left
+            titleLayout.VerticalAlignment = Enum.VerticalAlignment.Center
+            titleLayout.Padding = UDim.new(0, 0)
+        end
+
+        local titlePadding = titleHolder:FindFirstChild("XuanWindowTitlePadding")
+        if not titlePadding then
+            titlePadding = Instance.new("UIPadding")
+            titlePadding.Name = "XuanWindowTitlePadding"
+            titlePadding.PaddingLeft = UDim.new(0, 14)
+            titlePadding.PaddingRight = UDim.new(0, 8)
+            titlePadding.Parent = titleHolder
+        end
+
+        for _, child in ipairs(titleHolder:GetChildren()) do
+            if child:IsA("ImageLabel") then
+                child.Visible = false
+                child.Size = UDim2.fromOffset(0, 0)
+            end
+        end
+
+        title.Visible = true
+        title.LayoutOrder = 1
+        title.Size = UDim2.new(1, -22, 0, 22)
+        title.TextXAlignment = Enum.TextXAlignment.Left
+        title.TextYAlignment = Enum.TextYAlignment.Bottom
+        title.TextSize = 20
+        title.TextTransparency = 0
+
+        local subtitle = titleHolder:FindFirstChild("XuanWindowSubtitle")
+        if not subtitle then
+            subtitle = Instance.new("TextLabel")
+            subtitle.Name = "XuanWindowSubtitle"
+            subtitle.BackgroundTransparency = 1
+            subtitle.BorderSizePixel = 0
+            subtitle.Parent = titleHolder
+        end
+        subtitle.LayoutOrder = 2
+        subtitle.Size = UDim2.new(1, -22, 0, 17)
+        subtitle.FontFace = Library.Scheme.Font
+        subtitle.TextColor3 = Library.Scheme.FontColor
+        subtitle.TextSize = 14
+        subtitle.TextTransparency = 0.35
+        subtitle.TextXAlignment = Enum.TextXAlignment.Left
+        subtitle.TextYAlignment = Enum.TextYAlignment.Top
+        subtitle.Text = tabDescription("Main")
+        addRegistry(Library, subtitle, { TextColor3 = "FontColor", FontFace = "Font" })
+
+        local search = topBar:FindFirstChildWhichIsA("TextBox", true)
+        local rightWrapper
+        if search then
+            search.Name = "XuanWindowSearch"
+            search.PlaceholderText = "Search..."
+            search.BackgroundTransparency = 0.12
+            search.Size = UDim2.new(1, -30, 1, 0)
+            local searchCorner = search:FindFirstChildOfClass("UICorner")
+            if searchCorner then
+                searchCorner.CornerRadius = UDim.new(1, 0)
+            end
+            local searchStroke = search:FindFirstChildOfClass("UIStroke")
+            if searchStroke then
+                searchStroke.Thickness = 1
+                searchStroke.Transparency = 0.2
+            end
+
+            rightWrapper = search.Parent
+            if rightWrapper and rightWrapper:IsA("Frame") then
+                rightWrapper.Name = "XuanWindowRightWrapper"
+                local rightPadding = rightWrapper:FindFirstChild("XuanWindowRightPadding")
+                if not rightPadding then
+                    rightPadding = Instance.new("UIPadding")
+                    rightPadding.Name = "XuanWindowRightPadding"
+                    rightPadding.PaddingRight = UDim.new(0, 30)
+                    rightPadding.Parent = rightWrapper
+                end
+            end
+        end
+
+        local minimize = topBar:FindFirstChild("XuanWindowMinimize")
+        if not minimize then
+            minimize = Instance.new("ImageButton")
+            minimize.Name = "XuanWindowMinimize"
+            minimize.AnchorPoint = Vector2.new(1, 0.5)
+            minimize.BackgroundTransparency = 1
+            minimize.BorderSizePixel = 0
+            minimize.Position = UDim2.new(1, -44, 0.5, 0)
+            minimize.Size = UDim2.fromOffset(24, 24)
+            minimize.AutoButtonColor = false
+            minimize.ZIndex = 4
+            minimize.Parent = topBar
+
+            local minusIcon = type(Library.GetIcon) == "function" and Library:GetIcon("minus") or nil
+            if minusIcon then
+                minimize.Image = minusIcon.Url
+                minimize.ImageRectOffset = minusIcon.ImageRectOffset
+                minimize.ImageRectSize = minusIcon.ImageRectSize
+                minimize.ImageColor3 = Library.Scheme.OutlineColor
+                minimize.ImageTransparency = 0.15
+            else
+                local minusText = Instance.new("TextLabel")
+                minusText.Name = "FallbackIcon"
+                minusText.BackgroundTransparency = 1
+                minusText.Size = UDim2.fromScale(1, 1)
+                minusText.FontFace = Library.Scheme.Font
+                minusText.Text = "-"
+                minusText.TextColor3 = Library.Scheme.OutlineColor
+                minusText.TextSize = 22
+                minusText.Parent = minimize
+            end
+            addRegistry(Library, minimize, { ImageColor3 = "OutlineColor" })
+            local minimizeConnection = minimize.MouseButton1Click:Connect(function()
+                Library:Toggle()
+            end)
+            if type(Library.GiveSignal) == "function" then
+                Library:GiveSignal(minimizeConnection)
+            end
+        end
+
+        for _, child in ipairs(topBar:GetChildren()) do
+            if child:IsA("ImageLabel")
+                and child.AnchorPoint.X == 1
+                and child.Position.X.Scale == 1 then
+                child.ImageTransparency = 0.35
+            end
+        end
+
+        header.MainFrame = mainFrame
+        header.TopBar = topBar
+        header.TitleHolder = titleHolder
+        header.RightWrapper = rightWrapper
+        header.Divider = divider
+        header.Title = title
+        header.Subtitle = subtitle
+        header.Search = search
+        header.Minimize = minimize
+
+        titleHolder.Size = UDim2.new(XUAN_HEADER_TITLE_WIDTH, 0, 1, 0)
+        title.Visible = true
+        if rightWrapper and rightWrapper:IsA("Frame") then
+            rightWrapper.Size = UDim2.new(XUAN_HEADER_RIGHT_WIDTH, 0, 1, -16)
+        end
+        if divider then
+            local sidebarWidth = Window:GetSidebarWidth()
+            divider.Position = UDim2.fromOffset(sidebarWidth, 48)
+            divider.Size = UDim2.new(0, 1, 1, -69)
+        end
+        return true
+    end
+
+    local function updateWindowHeader(name, description)
+        if not findWindowHeader() then
+            return
+        end
+        header.Title.Text = tostring(name or "Main")
+        header.Subtitle.Text = tostring(description or tabDescription(name))
+    end
+
+    findWindowHeader()
+    updateWindowHeader("Main", tabDescription("Main"))
+
+    local nativeSetSidebarWidth = Window.SetSidebarWidth
+    Window.SetSidebarWidth = function(self, width)
+        local result = nativeSetSidebarWidth(self, width)
+        if header.TitleHolder and header.TitleHolder.Parent then
+            header.TitleHolder.Size = UDim2.new(XUAN_HEADER_TITLE_WIDTH, 0, 1, 0)
+            header.Title.Visible = true
+        end
+        if header.RightWrapper and header.RightWrapper.Parent then
+            header.RightWrapper.Size = UDim2.new(XUAN_HEADER_RIGHT_WIDTH, 0, 1, -16)
+        end
+        if header.Divider and header.Divider.Parent then
+            header.Divider.Position = UDim2.fromOffset(width, 48)
+            header.Divider.Size = UDim2.new(0, 1, 1, -69)
+        end
+        return result
+    end
+
+    Window.ShowTabInfo = function(_, name, description)
+        updateWindowHeader(name, description)
+    end
+    Window.HideTabInfo = function() end
+
+    local function styleToggleButton(button)
+        button.Text = ""
+        button.Size = UDim2.fromOffset(142, 40)
+
+        local icon = button:FindFirstChild("Xuan4ShoIcon")
+        if not icon then
+            icon = button:FindFirstChildWhichIsA("ImageLabel")
+            if icon then
+                icon.Name = "Xuan4ShoIcon"
+            end
+        end
+        if not icon then
+            icon = Instance.new("ImageLabel")
+            icon.Name = "Xuan4ShoIcon"
+            icon.BackgroundTransparency = 1
+            icon.Parent = button
+        end
+
+        local customIcon = Library:GetCustomIcon(XUAN_ICON_ASSET)
+        icon.Image = customIcon.Url
+        icon.ImageRectOffset = customIcon.ImageRectOffset
+        icon.ImageRectSize = customIcon.ImageRectSize
+        icon.AnchorPoint = Vector2.new(0, 0.5)
+        icon.Position = UDim2.new(0, 10, 0.5, 0)
+        icon.Size = UDim2.fromOffset(24, 24)
+        icon.ImageColor3 = Library.Scheme.FontColor
+        icon.ZIndex = 11
+        addRegistry(Library, icon, { ImageColor3 = "FontColor" })
+
+        local wordmark = button:FindFirstChild("Xuan4ShoWordmark")
+        if not wordmark then
+            wordmark = Instance.new("TextLabel")
+            wordmark.Name = "Xuan4ShoWordmark"
+            wordmark.BackgroundTransparency = 1
+            wordmark.BorderSizePixel = 0
+            wordmark.Parent = button
+            addRegistry(Library, wordmark, {
+                TextColor3 = "FontColor",
+                FontFace = "Font",
+            })
+        end
+        wordmark.AnchorPoint = Vector2.new(0, 0.5)
+        wordmark.Position = UDim2.new(0, 42, 0.5, 0)
+        wordmark.Size = UDim2.new(1, -48, 0, 24)
+        wordmark.FontFace = Library.Scheme.Font
+        wordmark.Text = "XUAN4SHO"
+        wordmark.TextColor3 = Library.Scheme.FontColor
+        wordmark.TextSize = 15
+        wordmark.TextXAlignment = Enum.TextXAlignment.Left
+        wordmark.TextYAlignment = Enum.TextYAlignment.Center
+        wordmark.ZIndex = 11
+    end
+
+    if not Library.IsMobile then
+        local toggleButton = Library:AddDraggableImageButton({
+            Icon = XUAN_ICON_ASSET,
+            IconSize = 24,
+            Func = function()
+                Library:Toggle()
+            end,
+        })
+        toggleButton.Button.AnchorPoint = Vector2.new(0, 0)
+        toggleButton.Button.Position = UDim2.fromOffset(10, 60)
+        styleToggleButton(toggleButton.Button)
+
+        local closeButton = Library:AddDraggableButton({
+            Text = "X Close",
+            Func = function()
+                if Window and type(Window.AddDialog) == "function" then
+                    Window:AddDialog("ExitScriptConfirm", {
+                        Title = "Exit Script?",
+                        Description = "Are you sure you want to exit?",
+                        Icon = "alert-triangle",
+                        AutoDismiss = true,
+                        OutsideClickDismiss = true,
+                        FooterButtons = {
+                            Cancel = { Title = "Cancel", Variant = "Ghost", Order = 1 },
+                            Confirm = {
+                                Title = "Yes, Exit",
+                                Variant = "Primary",
+                                Order = 2,
+                                Callback = function()
+                                    Library.ScreenGui:Destroy()
+                                end,
+                            },
+                        },
+                    })
+                else
+                    Library.ScreenGui:Destroy()
+                end
+            end,
+        })
+        closeButton.Button.AnchorPoint = Vector2.new(0, 0)
+        closeButton.Button.Position = UDim2.fromOffset(164, 60)
+        local closeText = closeButton.Button:FindFirstChildOfClass("TextLabel")
+        if closeText then
+            closeText.TextColor3 = Color3.fromRGB(255, 75, 75)
+        end
+    else
+        local toggleButton
+        local lockButton
+        for _, child in ipairs(Library.ScreenGui:GetDescendants()) do
+            if child:IsA("TextButton") then
+                if child.Text == "Toggle" then
+                    toggleButton = child
+                elseif child.Text == "Lock" or child.Text == "Unlock" then
+                    lockButton = child
+                end
+            end
+        end
+
+        if toggleButton then
+            styleToggleButton(toggleButton)
+            if lockButton then
+                if toggleButton.AnchorPoint.X == 1 then
+                    lockButton.Position = UDim2.new(1, -(toggleButton.Size.X.Offset + 12), 0, toggleButton.Position.Y.Offset)
+                else
+                    lockButton.Position = UDim2.fromOffset(
+                        toggleButton.Position.X.Offset + toggleButton.Size.X.Offset + 12,
+                        toggleButton.Position.Y.Offset
+                    )
+                end
+            end
+        end
+    end
+end
+
+local Library = loadModifiedLibrary()
+local ThemeManager = assert(loadstring(game:HttpGet(THEME_URL)), "XUAN ThemeManager loadstring failed")()
+local SaveManager = assert(loadstring(game:HttpGet(SAVE_URL)), "XUAN SaveManager loadstring failed")()
+
+local nativeCreateWindow = Library.CreateWindow
+Library.CreateWindow = function(self, windowInfo)
+    local Window = nativeCreateWindow(self, windowInfo)
+    applyXuanWindowStyle(self, Window)
+    return Window
+end
+
+return Library, ThemeManager, SaveManager
