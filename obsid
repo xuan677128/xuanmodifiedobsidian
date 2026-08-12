@@ -377,7 +377,7 @@ local function applyXuanWindowStyle(Library, Window)
         wordmark.FontFace = Library.Scheme.Font
         wordmark.Text = "XUAN4SHO"
         wordmark.TextColor3 = Library.Scheme.FontColor
-        wordmark.TextSize = 15
+        wordmark.TextSize = 18
         wordmark.TextXAlignment = Enum.TextXAlignment.Left
         wordmark.TextYAlignment = Enum.TextYAlignment.Center
         wordmark.ZIndex = 11
