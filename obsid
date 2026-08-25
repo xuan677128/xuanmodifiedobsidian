@@ -100,9 +100,9 @@ local function applyXuanWindowStyle(Library, Window, windowInfo)
     local circleMode = (windowInfo.CircleLogo ~= false and (windowInfo.Wordmark == nil and windowInfo.ToggleText == nil))
     local toggleText = tostring(windowInfo.ToggleText or windowInfo.Wordmark or "XUAN4SHO")
     local toggleIconAsset = windowInfo.ToggleIcon or windowInfo.Icon or XUAN_ICON_ASSET
-    local toggleSize = windowInfo.ToggleSize or (circleMode and UDim2.fromOffset(44, 44) or UDim2.fromOffset(142, 40))
+    local toggleSize = windowInfo.ToggleSize or (circleMode and UDim2.fromOffset(46, 46) or UDim2.fromOffset(142, 40))
     local togglePos = windowInfo.TogglePosition or UDim2.fromOffset(10, 60)
-    local showCloseBtn = (windowInfo.ShowCloseButton ~= false and windowInfo.CloseButton ~= false)
+    local showCloseBtn = (windowInfo.ShowCloseButton == true or windowInfo.CloseButton == true)
     local closeBtnText = tostring(windowInfo.CloseButtonText or "X Close")
     local closeBtnPos = windowInfo.CloseButtonPosition or (circleMode and UDim2.fromOffset(62, 60) or UDim2.fromOffset(164, 60))
     local closeDialogTitle = tostring(windowInfo.CloseDialogTitle or "Exit Script?")
@@ -430,7 +430,7 @@ local function applyXuanWindowStyle(Library, Window, windowInfo)
         if circleMode then
             icon.AnchorPoint = Vector2.new(0.5, 0.5)
             icon.Position = UDim2.fromScale(0.5, 0.5)
-            icon.Size = UDim2.fromOffset(26, 26)
+            icon.Size = UDim2.fromOffset(36, 36)
             if wordmark then
                 wordmark.Visible = false
             end
