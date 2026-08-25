@@ -60,26 +60,57 @@ local function addRegistry(Library, instance, properties)
     end
 end
 
-local XUAN_TAB_DESCRIPTIONS = {
+-- Default fallback tab descriptions across games
+local DEFAULT_TAB_DESCRIPTIONS = {
     Home = "Home dashboard",
     Main = "Main features",
+    Steal = "Egg stealing and flight engine",
+    Automation = "Auto hatch, place, and sell eggs",
+    Webhooks = "Discord telemetry and alerts",
     Planting = "Planting features",
     ["Moon Prediction"] = "Moon prediction tools",
     Method = "Method features",
     ["Paid Features"] = "Paid features",
     Shop = "Shop features",
-    ESP = "ESP features",
-    Settings = "Settings and utilities",
+    ESP = "ESP and visual highlights",
+    Settings = "Settings and config utilities",
 }
-local XUAN_HEADER_TITLE_WIDTH = 0.36
-local XUAN_HEADER_RIGHT_WIDTH = 0.53
 
-local function applyXuanWindowStyle(Library, Window)
+local function applyXuanWindowStyle(Library, Window, windowInfo)
+    windowInfo = windowInfo or {}
     local header = {}
+
+    -- Merge custom tab descriptions passed via CreateWindow with fallback defaults
+    local customTabDescriptions = {}
+    for k, v in pairs(DEFAULT_TAB_DESCRIPTIONS) do
+        customTabDescriptions[k] = v
+    end
+    if type(windowInfo.TabDescriptions) == "table" then
+        for k, v in pairs(windowInfo.TabDescriptions) do
+            customTabDescriptions[k] = v
+        end
+    elseif type(windowInfo.Subtitles) == "table" then
+        for k, v in pairs(windowInfo.Subtitles) do
+            customTabDescriptions[k] = v
+        end
+    end
+
+    local headerTitleWidth = tonumber(windowInfo.HeaderTitleWidth) or 0.36
+    local headerRightWidth = tonumber(windowInfo.HeaderRightWidth) or 0.53
+    local circleMode = (windowInfo.CircleLogo ~= false and (windowInfo.Wordmark == nil and windowInfo.ToggleText == nil))
+    local toggleText = tostring(windowInfo.ToggleText or windowInfo.Wordmark or "XUAN4SHO")
+    local toggleIconAsset = windowInfo.ToggleIcon or windowInfo.Icon or XUAN_ICON_ASSET
+    local toggleSize = windowInfo.ToggleSize or (circleMode and UDim2.fromOffset(44, 44) or UDim2.fromOffset(142, 40))
+    local togglePos = windowInfo.TogglePosition or UDim2.fromOffset(10, 60)
+    local showCloseBtn = (windowInfo.ShowCloseButton ~= false and windowInfo.CloseButton ~= false)
+    local closeBtnText = tostring(windowInfo.CloseButtonText or "X Close")
+    local closeBtnPos = windowInfo.CloseButtonPosition or (circleMode and UDim2.fromOffset(62, 60) or UDim2.fromOffset(164, 60))
+    local closeDialogTitle = tostring(windowInfo.CloseDialogTitle or "Exit Script?")
+    local closeDialogDesc = tostring(windowInfo.CloseDialogDesc or "Are you sure you want to exit?")
 
     local function tabDescription(name)
         name = tostring(name or "Main")
-        return XUAN_TAB_DESCRIPTIONS[name] or (name .. " features")
+        return customTabDescriptions[name] or (name .. " features")
     end
 
     local function findWindowHeader()
@@ -193,7 +224,7 @@ local function applyXuanWindowStyle(Library, Window)
         subtitle.TextTransparency = 0.35
         subtitle.TextXAlignment = Enum.TextXAlignment.Left
         subtitle.TextYAlignment = Enum.TextYAlignment.Top
-        subtitle.Text = tabDescription("Main")
+        subtitle.Text = windowInfo.Subtitle or windowInfo.DefaultSubtitle or tabDescription("Main")
         addRegistry(Library, subtitle, { TextColor3 = "FontColor", FontFace = "Font" })
 
         local search = topBar:FindFirstChildWhichIsA("TextBox", true)
@@ -284,10 +315,10 @@ local function applyXuanWindowStyle(Library, Window)
         header.Search = search
         header.Minimize = minimize
 
-        titleHolder.Size = UDim2.new(XUAN_HEADER_TITLE_WIDTH, 0, 1, 0)
+        titleHolder.Size = UDim2.new(headerTitleWidth, 0, 1, 0)
         title.Visible = true
         if rightWrapper and rightWrapper:IsA("Frame") then
-            rightWrapper.Size = UDim2.new(XUAN_HEADER_RIGHT_WIDTH, 0, 1, -16)
+            rightWrapper.Size = UDim2.new(headerRightWidth, 0, 1, -16)
         end
         if divider then
             local sidebarWidth = Window:GetSidebarWidth()
@@ -306,17 +337,17 @@ local function applyXuanWindowStyle(Library, Window)
     end
 
     findWindowHeader()
-    updateWindowHeader("Main", tabDescription("Main"))
+    updateWindowHeader("Main", windowInfo.Subtitle or windowInfo.DefaultSubtitle or tabDescription("Main"))
 
     local nativeSetSidebarWidth = Window.SetSidebarWidth
     Window.SetSidebarWidth = function(self, width)
         local result = nativeSetSidebarWidth(self, width)
         if header.TitleHolder and header.TitleHolder.Parent then
-            header.TitleHolder.Size = UDim2.new(XUAN_HEADER_TITLE_WIDTH, 0, 1, 0)
+            header.TitleHolder.Size = UDim2.new(headerTitleWidth, 0, 1, 0)
             header.Title.Visible = true
         end
         if header.RightWrapper and header.RightWrapper.Parent then
-            header.RightWrapper.Size = UDim2.new(XUAN_HEADER_RIGHT_WIDTH, 0, 1, -16)
+            header.RightWrapper.Size = UDim2.new(headerRightWidth, 0, 1, -16)
         end
         if header.Divider and header.Divider.Parent then
             header.Divider.Position = UDim2.fromOffset(width, 48)
@@ -330,9 +361,48 @@ local function applyXuanWindowStyle(Library, Window)
     end
     Window.HideTabInfo = function() end
 
+    -- Runtime customization helper methods for Window
+    Window.SetTabDescription = function(_, tabName, description)
+        customTabDescriptions[tostring(tabName)] = tostring(description)
+    end
+
+    Window.SetTabDescriptions = function(_, descriptionsTable)
+        if type(descriptionsTable) == "table" then
+            for k, v in pairs(descriptionsTable) do
+                customTabDescriptions[tostring(k)] = tostring(v)
+            end
+        end
+    end
+
+    Window.SetSubtitle = function(_, text)
+        if header.Subtitle and header.Subtitle.Parent then
+            header.Subtitle.Text = tostring(text or "")
+        end
+    end
+
+    local floatingToggleBtn = nil
+    local floatingCloseBtn = nil
+
     local function styleToggleButton(button)
         button.Text = ""
-        button.Size = UDim2.fromOffset(142, 40)
+        button.Size = toggleSize
+
+        local corner = button:FindFirstChildOfClass("UICorner")
+        if not corner then
+            corner = Instance.new("UICorner")
+            corner.Parent = button
+        end
+        corner.CornerRadius = circleMode and UDim.new(1, 0) or UDim.new(0, 8)
+
+        local stroke = button:FindFirstChildOfClass("UIStroke")
+        if not stroke then
+            stroke = Instance.new("UIStroke")
+            stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+            stroke.Thickness = 1.2
+            stroke.Transparency = 0.25
+            stroke.Parent = button
+            addRegistry(Library, stroke, { Color = "OutlineColor" })
+        end
 
         local icon = button:FindFirstChild("Xuan4ShoIcon")
         if not icon then
@@ -348,85 +418,138 @@ local function applyXuanWindowStyle(Library, Window)
             icon.Parent = button
         end
 
-        local customIcon = Library:GetCustomIcon(XUAN_ICON_ASSET)
+        local customIcon = Library:GetCustomIcon(toggleIconAsset)
         icon.Image = customIcon.Url
         icon.ImageRectOffset = customIcon.ImageRectOffset
         icon.ImageRectSize = customIcon.ImageRectSize
-        icon.AnchorPoint = Vector2.new(0, 0.5)
-        icon.Position = UDim2.new(0, 10, 0.5, 0)
-        icon.Size = UDim2.fromOffset(24, 24)
         icon.ImageColor3 = Library.Scheme.FontColor
         icon.ZIndex = 11
         addRegistry(Library, icon, { ImageColor3 = "FontColor" })
 
         local wordmark = button:FindFirstChild("Xuan4ShoWordmark")
-        if not wordmark then
-            wordmark = Instance.new("TextLabel")
-            wordmark.Name = "Xuan4ShoWordmark"
-            wordmark.BackgroundTransparency = 1
-            wordmark.BorderSizePixel = 0
-            wordmark.Parent = button
-            addRegistry(Library, wordmark, {
-                TextColor3 = "FontColor",
-                FontFace = "Font",
-            })
+        if circleMode then
+            icon.AnchorPoint = Vector2.new(0.5, 0.5)
+            icon.Position = UDim2.fromScale(0.5, 0.5)
+            icon.Size = UDim2.fromOffset(26, 26)
+            if wordmark then
+                wordmark.Visible = false
+            end
+        else
+            if not wordmark then
+                wordmark = Instance.new("TextLabel")
+                wordmark.Name = "Xuan4ShoWordmark"
+                wordmark.BackgroundTransparency = 1
+                wordmark.BorderSizePixel = 0
+                wordmark.Parent = button
+                addRegistry(Library, wordmark, {
+                    TextColor3 = "FontColor",
+                    FontFace = "Font",
+                })
+            end
+            icon.AnchorPoint = Vector2.new(0, 0.5)
+            icon.Position = UDim2.new(0, 10, 0.5, 0)
+            icon.Size = UDim2.fromOffset(24, 24)
+
+            wordmark.Visible = true
+            wordmark.AnchorPoint = Vector2.new(0, 0.5)
+            wordmark.Position = UDim2.new(0, 42, 0.5, 0)
+            wordmark.Size = UDim2.new(1, -48, 0, 24)
+            wordmark.FontFace = Library.Scheme.Font
+            wordmark.Text = toggleText
+            wordmark.TextColor3 = Library.Scheme.FontColor
+            wordmark.TextSize = 18
+            wordmark.TextXAlignment = Enum.TextXAlignment.Left
+            wordmark.TextYAlignment = Enum.TextYAlignment.Center
+            wordmark.ZIndex = 11
         end
-        wordmark.AnchorPoint = Vector2.new(0, 0.5)
-        wordmark.Position = UDim2.new(0, 42, 0.5, 0)
-        wordmark.Size = UDim2.new(1, -48, 0, 24)
-        wordmark.FontFace = Library.Scheme.Font
-        wordmark.Text = "XUAN4SHO"
-        wordmark.TextColor3 = Library.Scheme.FontColor
-        wordmark.TextSize = 18
-        wordmark.TextXAlignment = Enum.TextXAlignment.Left
-        wordmark.TextYAlignment = Enum.TextYAlignment.Center
-        wordmark.ZIndex = 11
+    end
+
+    Window.SetToggleText = function(_, text)
+        toggleText = tostring(text or "XUAN4SHO")
+        if floatingToggleBtn and floatingToggleBtn.Button then
+            local wm = floatingToggleBtn.Button:FindFirstChild("Xuan4ShoWordmark")
+            if wm then wm.Text = toggleText end
+        end
+    end
+
+    Window.SetToggleIcon = function(_, assetId)
+        toggleIconAsset = assetId or XUAN_ICON_ASSET
+        if floatingToggleBtn and floatingToggleBtn.Button then
+            local ic = floatingToggleBtn.Button:FindFirstChild("Xuan4ShoIcon")
+            if ic then
+                local customIcon = Library:GetCustomIcon(toggleIconAsset)
+                ic.Image = customIcon.Url
+                ic.ImageRectOffset = customIcon.ImageRectOffset
+                ic.ImageRectSize = customIcon.ImageRectSize
+            end
+        end
+    end
+
+    Window.SetCloseButtonVisible = function(_, visible)
+        if floatingCloseBtn and floatingCloseBtn.Button then
+            floatingCloseBtn.Button.Visible = (visible == true)
+        end
+    end
+
+    Window.SetToggleButtonVisible = function(_, visible)
+        if floatingToggleBtn and floatingToggleBtn.Button then
+            floatingToggleBtn.Button.Visible = (visible == true)
+        end
     end
 
     if not Library.IsMobile then
-        local toggleButton = Library:AddDraggableImageButton({
-            Icon = XUAN_ICON_ASSET,
-            IconSize = 24,
-            Func = function()
-                Library:Toggle()
-            end,
-        })
-        toggleButton.Button.AnchorPoint = Vector2.new(0, 0)
-        toggleButton.Button.Position = UDim2.fromOffset(10, 60)
-        styleToggleButton(toggleButton.Button)
+        if windowInfo.ShowToggleButton ~= false and windowInfo.EnableToggleButton ~= false then
+            floatingToggleBtn = Library:AddDraggableImageButton({
+                Icon = toggleIconAsset,
+                IconSize = 24,
+                Func = function()
+                    Library:Toggle()
+                end,
+            })
+            floatingToggleBtn.Button.AnchorPoint = Vector2.new(0, 0)
+            floatingToggleBtn.Button.Position = togglePos
+            styleToggleButton(floatingToggleBtn.Button)
+        end
 
-        local closeButton = Library:AddDraggableButton({
-            Text = "X Close",
-            Func = function()
-                if Window and type(Window.AddDialog) == "function" then
-                    Window:AddDialog("ExitScriptConfirm", {
-                        Title = "Exit Script?",
-                        Description = "Are you sure you want to exit?",
-                        Icon = "alert-triangle",
-                        AutoDismiss = true,
-                        OutsideClickDismiss = true,
-                        FooterButtons = {
-                            Cancel = { Title = "Cancel", Variant = "Ghost", Order = 1 },
-                            Confirm = {
-                                Title = "Yes, Exit",
-                                Variant = "Primary",
-                                Order = 2,
-                                Callback = function()
-                                    Library.ScreenGui:Destroy()
-                                end,
+        if showCloseBtn then
+            floatingCloseBtn = Library:AddDraggableButton({
+                Text = closeBtnText,
+                Func = function()
+                    local function executeClose()
+                        if type(windowInfo.OnClose) == "function" then
+                            pcall(windowInfo.OnClose)
+                        end
+                        Library.ScreenGui:Destroy()
+                    end
+
+                    if Window and type(Window.AddDialog) == "function" then
+                        Window:AddDialog("ExitScriptConfirm", {
+                            Title = closeDialogTitle,
+                            Description = closeDialogDesc,
+                            Icon = "alert-triangle",
+                            AutoDismiss = true,
+                            OutsideClickDismiss = true,
+                            FooterButtons = {
+                                Cancel = { Title = "Cancel", Variant = "Ghost", Order = 1 },
+                                Confirm = {
+                                    Title = "Yes, Exit",
+                                    Variant = "Primary",
+                                    Order = 2,
+                                    Callback = executeClose,
+                                },
                             },
-                        },
-                    })
-                else
-                    Library.ScreenGui:Destroy()
-                end
-            end,
-        })
-        closeButton.Button.AnchorPoint = Vector2.new(0, 0)
-        closeButton.Button.Position = UDim2.fromOffset(164, 60)
-        local closeText = closeButton.Button:FindFirstChildOfClass("TextLabel")
-        if closeText then
-            closeText.TextColor3 = Color3.fromRGB(255, 75, 75)
+                        })
+                    else
+                        executeClose()
+                    end
+                end,
+            })
+            floatingCloseBtn.Button.AnchorPoint = Vector2.new(0, 0)
+            floatingCloseBtn.Button.Position = closeBtnPos
+            local closeText = floatingCloseBtn.Button:FindFirstChildOfClass("TextLabel")
+            if closeText then
+                closeText.TextColor3 = Color3.fromRGB(255, 75, 75)
+            end
         end
     else
         local toggleButton
@@ -461,10 +584,38 @@ local Library = loadModifiedLibrary()
 local ThemeManager = assert(loadstring(game:HttpGet(THEME_URL)), "XUAN ThemeManager loadstring failed")()
 local SaveManager = assert(loadstring(game:HttpGet(SAVE_URL)), "XUAN SaveManager loadstring failed")()
 
+-- Set Default Theme to Soft Girl Pink
+local PINK_SCHEME = {
+    FontColor = "ffffff",
+    MainColor = "181517",
+    AccentColor = "ff70a6",
+    BackgroundColor = "0f0d0e",
+    OutlineColor = "30242a",
+    BackgroundImage = "",
+}
+
+if ThemeManager and ThemeManager.BuiltInThemes then
+    ThemeManager.BuiltInThemes["Soft Girl Pink"] = { 1, PINK_SCHEME }
+    ThemeManager.BuiltInThemes["Default"] = { 2, PINK_SCHEME }
+    ThemeManager.DefaultThemeName = "Soft Girl Pink"
+end
+
+if Library and Library.Scheme then
+    Library.Scheme.AccentColor = Color3.fromHex("ff70a6")
+    Library.Scheme.MainColor = Color3.fromHex("181517")
+    Library.Scheme.BackgroundColor = Color3.fromHex("0f0d0e")
+    Library.Scheme.OutlineColor = Color3.fromHex("30242a")
+    Library.Scheme.FontColor = Color3.fromHex("ffffff")
+end
+
 local nativeCreateWindow = Library.CreateWindow
 Library.CreateWindow = function(self, windowInfo)
+    windowInfo = windowInfo or {}
+    if not windowInfo.Footer or windowInfo.Footer == "Made By XUAN4SHO" then
+        windowInfo.Footer = "Made By XUAN SOFT GIRL"
+    end
     local Window = nativeCreateWindow(self, windowInfo)
-    applyXuanWindowStyle(self, Window)
+    applyXuanWindowStyle(self, Window, windowInfo)
     return Window
 end
 
