@@ -1,36 +1,14 @@
-local OBSIDIAN_URLS = {
-    "https://cdn.jsdelivr.net/gh/deividcomsono/Obsidian@main/Library.lua",
-    "https://raw.githubusercontent.com/deividcomsono/Obsidian/refs/heads/main/Library.lua",
-    "https://raw.githubusercontent.com/deividcomsono/Obsidian/master/Library.lua"
-}
-local THEME_URLS = {
-    "https://cdn.jsdelivr.net/gh/deividcomsono/Obsidian@main/addons/ThemeManager.lua",
-    "https://raw.githubusercontent.com/deividcomsono/Obsidian/refs/heads/main/addons/ThemeManager.lua",
-    "https://raw.githubusercontent.com/deividcomsono/Obsidian/master/addons/ThemeManager.lua"
-}
-local SAVE_URLS = {
-    "https://cdn.jsdelivr.net/gh/deividcomsono/Obsidian@main/addons/SaveManager.lua",
-    "https://raw.githubusercontent.com/deividcomsono/Obsidian/refs/heads/main/addons/SaveManager.lua",
-    "https://raw.githubusercontent.com/deividcomsono/Obsidian/master/addons/SaveManager.lua"
-}
+local OBSIDIAN_URL = "https://raw.githubusercontent.com/deividcomsono/Obsidian/refs/heads/main/Library.lua"
+local THEME_URL = "https://raw.githubusercontent.com/deividcomsono/Obsidian/refs/heads/main/addons/ThemeManager.lua"
+local SAVE_URL = "https://raw.githubusercontent.com/deividcomsono/Obsidian/refs/heads/main/addons/SaveManager.lua"
 local XUAN_ICON_ASSET = 108980322155893
 
 local Players = game:GetService("Players")
 local player = Players.LocalPlayer or Players.PlayerAdded:Wait()
 
-local function safeHttpGet(urls)
-    for _, u in ipairs(urls) do
-        local ok, res = pcall(function() return game:HttpGet(u) end)
-        if ok and type(res) == "string" and #res > 500 and not res:find("400: Bad Request") and not res:find("404: Not Found") and not res:find("<!DOCTYPE html>") then
-            return res
-        end
-    end
-    error("XUAN Obsidian: Failed to fetch component from all mirrors!")
-end
-
 local function loadModifiedLibrary()
     local playerGui = player:WaitForChild("PlayerGui")
-    local source = safeHttpGet(OBSIDIAN_URLS)
+    local source = game:HttpGet(OBSIDIAN_URL)
 
     source = source:gsub(
         'gethui%s*%([^%)]*%)',
@@ -63,6 +41,13 @@ local function loadModifiedLibrary()
     source = source:gsub('Color3%.fromRGB%(125,%s*85,%s*255%)', 'Color3.fromRGB(255, 112, 166)')
     source = source:gsub('7c5cff', 'ff70a6')
     source = source:gsub('7d55ff', 'ff70a6')
+
+    -- Disable default Lock button on Mobile in Obsidian source
+    source = source:gsub('local LockButton = Library:AddDraggableButton%("Lock".-end, true, true%)', '')
+    source = source:gsub('LockButton%.Button%.AnchorPoint = [^\n]+', '')
+    source = source:gsub('LockButton%.Button%.Position = [^\n]+', '')
+    source = source:gsub('LockButton%.Button%.Visible = false', '')
+    source = source:gsub('LockButton%.Button%.Visible = [^\n]+', '')
 
     local libraryFunc = assert(loadstring(source), "XUAN Obsidian loadstring failed")
     local Library = libraryFunc()
@@ -620,29 +605,19 @@ local function applyXuanWindowStyle(Library, Window, windowInfo)
         end
     else
         local toggleButton
-        local lockButton
         for _, child in ipairs(Library.ScreenGui:GetDescendants()) do
-            if child:IsA("TextButton") then
+            if child:IsA("TextButton") or child:IsA("ImageButton") then
                 if child.Text == "Toggle" then
                     toggleButton = child
-                elseif child.Text == "Lock" or child.Text == "Unlock" then
-                    lockButton = child
+                elseif child.Text == "Lock" or child.Text == "Unlock" or child.Name == "Lock" or child.Name == "LockButton" then
+                    child.Visible = false
+                    pcall(function() child:Destroy() end)
                 end
             end
         end
 
         if toggleButton then
             styleToggleButton(toggleButton)
-            if lockButton then
-                if toggleButton.AnchorPoint.X == 1 then
-                    lockButton.Position = UDim2.new(1, -(toggleButton.Size.X.Offset + 12), 0, toggleButton.Position.Y.Offset)
-                else
-                    lockButton.Position = UDim2.fromOffset(
-                        toggleButton.Position.X.Offset + toggleButton.Size.X.Offset + 12,
-                        toggleButton.Position.Y.Offset
-                    )
-                end
-            end
         end
     end
 end
