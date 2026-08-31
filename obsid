@@ -624,13 +624,13 @@ end
 
 local Library = loadModifiedLibrary()
 
-local themeSource = safeHttpGet(THEME_URLS)
+local themeSource = game:HttpGet(THEME_URL)
 themeSource = themeSource:gsub('7c5cff', 'ff70a6')
 themeSource = themeSource:gsub('7d55ff', 'ff70a6')
 themeSource = themeSource:gsub('125,%s*85,%s*255', '255, 112, 166')
 local ThemeManager = assert(loadstring(themeSource), "XUAN ThemeManager loadstring failed")()
 
-local saveSource = safeHttpGet(SAVE_URLS)
+local saveSource = game:HttpGet(SAVE_URL)
 local SaveManager = assert(loadstring(saveSource), "XUAN SaveManager loadstring failed")()
 
 -- Set Default Theme to Soft Girl Pink
