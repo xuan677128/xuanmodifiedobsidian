@@ -59,8 +59,21 @@ local function loadModifiedLibrary()
         end
     end
 
+    -- Patch default accent colors from Violet (7c5cff / 125,85,255) to Soft Girl Pink (#ff70a6 / 255,112,166)
+    source = source:gsub('Color3%.fromRGB%(125,%s*85,%s*255%)', 'Color3.fromRGB(255, 112, 166)')
+    source = source:gsub('7c5cff', 'ff70a6')
+    source = source:gsub('7d55ff', 'ff70a6')
+
     local libraryFunc = assert(loadstring(source), "XUAN Obsidian loadstring failed")
     local Library = libraryFunc()
+
+    if Library and Library.Scheme then
+        Library.Scheme.AccentColor = Color3.fromHex("ff70a6")
+        Library.Scheme.MainColor = Color3.fromHex("181517")
+        Library.Scheme.BackgroundColor = Color3.fromHex("0f0d0e")
+        Library.Scheme.OutlineColor = Color3.fromHex("30242a")
+        Library.Scheme.FontColor = Color3.fromHex("ffffff")
+    end
 
     if getgenv then
         getgenv().gethui = oldGetHui
@@ -255,7 +268,7 @@ local function applyXuanWindowStyle(Library, Window, windowInfo)
             search.Name = "XuanWindowSearch"
             search.PlaceholderText = "Search..."
             search.BackgroundTransparency = 0.12
-            search.Size = UDim2.new(1, -30, 1, 0)
+            search.Size = UDim2.new(1, -20, 1, 0)
             local searchCorner = search:FindFirstChildOfClass("UICorner")
             if searchCorner then
                 searchCorner.CornerRadius = UDim.new(1, 0)
@@ -269,13 +282,28 @@ local function applyXuanWindowStyle(Library, Window, windowInfo)
             rightWrapper = search.Parent
             if rightWrapper and rightWrapper:IsA("Frame") then
                 rightWrapper.Name = "XuanWindowRightWrapper"
+                rightWrapper.AnchorPoint = Vector2.new(1, 0.5)
+                rightWrapper.Position = UDim2.new(1, -78, 0.5, 0)
+                rightWrapper.Size = UDim2.new(0, 190, 1, -14)
                 local rightPadding = rightWrapper:FindFirstChild("XuanWindowRightPadding")
                 if not rightPadding then
                     rightPadding = Instance.new("UIPadding")
                     rightPadding.Name = "XuanWindowRightPadding"
-                    rightPadding.PaddingRight = UDim.new(0, 30)
+                    rightPadding.PaddingRight = UDim.new(0, 4)
                     rightPadding.Parent = rightWrapper
                 end
+            end
+        end
+
+        local dragIcon = nil
+        for _, child in ipairs(topBar:GetChildren()) do
+            if child:IsA("ImageLabel") and child.AnchorPoint.X == 1 then
+                dragIcon = child
+                dragIcon.AnchorPoint = Vector2.new(1, 0.5)
+                dragIcon.Position = UDim2.new(1, -10, 0.5, 0)
+                dragIcon.Size = UDim2.fromOffset(20, 20)
+                dragIcon.ImageTransparency = 0.25
+                break
             end
         end
 
@@ -286,10 +314,10 @@ local function applyXuanWindowStyle(Library, Window, windowInfo)
             minimize.AnchorPoint = Vector2.new(1, 0.5)
             minimize.BackgroundTransparency = 1
             minimize.BorderSizePixel = 0
-            minimize.Position = UDim2.new(1, -44, 0.5, 0)
+            minimize.Position = UDim2.new(1, -42, 0.5, 0)
             minimize.Size = UDim2.fromOffset(24, 24)
             minimize.AutoButtonColor = false
-            minimize.ZIndex = 4
+            minimize.ZIndex = 25
             minimize.Parent = topBar
 
             local minusIcon = type(Library.GetIcon) == "function" and Library:GetIcon("minus") or nil
@@ -297,26 +325,43 @@ local function applyXuanWindowStyle(Library, Window, windowInfo)
                 minimize.Image = minusIcon.Url
                 minimize.ImageRectOffset = minusIcon.ImageRectOffset
                 minimize.ImageRectSize = minusIcon.ImageRectSize
-                minimize.ImageColor3 = Library.Scheme.OutlineColor
-                minimize.ImageTransparency = 0.15
+                minimize.ImageColor3 = Color3.fromHex("ff70a6")
+                minimize.ImageTransparency = 0
             else
                 local minusText = Instance.new("TextLabel")
                 minusText.Name = "FallbackIcon"
                 minusText.BackgroundTransparency = 1
                 minusText.Size = UDim2.fromScale(1, 1)
                 minusText.FontFace = Library.Scheme.Font
-                minusText.Text = "-"
-                minusText.TextColor3 = Library.Scheme.OutlineColor
-                minusText.TextSize = 22
+                minusText.Text = "—"
+                minusText.TextColor3 = Color3.fromHex("ff70a6")
+                minusText.TextSize = 20
+                minusText.ZIndex = 26
                 minusText.Parent = minimize
             end
-            addRegistry(Library, minimize, { ImageColor3 = "OutlineColor" })
+
+            minimize.MouseEnter:Connect(function()
+                minimize.ImageColor3 = Color3.fromRGB(255, 180, 210)
+                local fb = minimize:FindFirstChild("FallbackIcon")
+                if fb then fb.TextColor3 = Color3.fromRGB(255, 180, 210) end
+            end)
+            minimize.MouseLeave:Connect(function()
+                minimize.ImageColor3 = Color3.fromHex("ff70a6")
+                local fb = minimize:FindFirstChild("FallbackIcon")
+                if fb then fb.TextColor3 = Color3.fromHex("ff70a6") end
+            end)
+
             local minimizeConnection = minimize.MouseButton1Click:Connect(function()
                 Library:Toggle()
             end)
             if type(Library.GiveSignal) == "function" then
                 Library:GiveSignal(minimizeConnection)
             end
+        else
+            minimize.Position = UDim2.new(1, -42, 0.5, 0)
+            minimize.Size = UDim2.fromOffset(24, 24)
+            minimize.ZIndex = 25
+            minimize.Visible = true
         end
 
         for _, child in ipairs(topBar:GetChildren()) do
@@ -603,8 +648,15 @@ local function applyXuanWindowStyle(Library, Window, windowInfo)
 end
 
 local Library = loadModifiedLibrary()
-local ThemeManager = assert(loadstring(safeHttpGet(THEME_URLS)), "XUAN ThemeManager loadstring failed")()
-local SaveManager = assert(loadstring(safeHttpGet(SAVE_URLS)), "XUAN SaveManager loadstring failed")()
+
+local themeSource = safeHttpGet(THEME_URLS)
+themeSource = themeSource:gsub('7c5cff', 'ff70a6')
+themeSource = themeSource:gsub('7d55ff', 'ff70a6')
+themeSource = themeSource:gsub('125,%s*85,%s*255', '255, 112, 166')
+local ThemeManager = assert(loadstring(themeSource), "XUAN ThemeManager loadstring failed")()
+
+local saveSource = safeHttpGet(SAVE_URLS)
+local SaveManager = assert(loadstring(saveSource), "XUAN SaveManager loadstring failed")()
 
 -- Set Default Theme to Soft Girl Pink
 local PINK_SCHEME = {
@@ -618,7 +670,7 @@ local PINK_SCHEME = {
 
 if ThemeManager and ThemeManager.BuiltInThemes then
     ThemeManager.BuiltInThemes["Soft Girl Pink"] = { 1, PINK_SCHEME }
-    ThemeManager.BuiltInThemes["Default"] = { 2, PINK_SCHEME }
+    ThemeManager.BuiltInThemes["Default"] = { 1, PINK_SCHEME }
     ThemeManager.DefaultThemeName = "Soft Girl Pink"
 end
 
@@ -636,8 +688,18 @@ Library.CreateWindow = function(self, windowInfo)
     if not windowInfo.Footer or windowInfo.Footer == "Made By XUAN4SHO" then
         windowInfo.Footer = "Made By XUAN SOFT GIRL"
     end
+    if Library.Scheme then
+        Library.Scheme.AccentColor = Color3.fromHex("ff70a6")
+        Library.Scheme.MainColor = Color3.fromHex("181517")
+        Library.Scheme.BackgroundColor = Color3.fromHex("0f0d0e")
+        Library.Scheme.OutlineColor = Color3.fromHex("30242a")
+        Library.Scheme.FontColor = Color3.fromHex("ffffff")
+    end
     local Window = nativeCreateWindow(self, windowInfo)
     applyXuanWindowStyle(self, Window, windowInfo)
+    if ThemeManager and type(ThemeManager.ApplyTheme) == "function" then
+        pcall(function() ThemeManager:ApplyTheme("Soft Girl Pink") end)
+    end
     return Window
 end
 
