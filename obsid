@@ -1,14 +1,36 @@
-local OBSIDIAN_URL = "https://raw.githubusercontent.com/deividcomsono/Obsidian/main/Library.lua"
-local THEME_URL = "https://raw.githubusercontent.com/deividcomsono/Obsidian/main/addons/ThemeManager.lua"
-local SAVE_URL = "https://raw.githubusercontent.com/deividcomsono/Obsidian/main/addons/SaveManager.lua"
+local OBSIDIAN_URLS = {
+    "https://cdn.jsdelivr.net/gh/deividcomsono/Obsidian@main/Library.lua",
+    "https://raw.githubusercontent.com/deividcomsono/Obsidian/refs/heads/main/Library.lua",
+    "https://raw.githubusercontent.com/deividcomsono/Obsidian/master/Library.lua"
+}
+local THEME_URLS = {
+    "https://cdn.jsdelivr.net/gh/deividcomsono/Obsidian@main/addons/ThemeManager.lua",
+    "https://raw.githubusercontent.com/deividcomsono/Obsidian/refs/heads/main/addons/ThemeManager.lua",
+    "https://raw.githubusercontent.com/deividcomsono/Obsidian/master/addons/ThemeManager.lua"
+}
+local SAVE_URLS = {
+    "https://cdn.jsdelivr.net/gh/deividcomsono/Obsidian@main/addons/SaveManager.lua",
+    "https://raw.githubusercontent.com/deividcomsono/Obsidian/refs/heads/main/addons/SaveManager.lua",
+    "https://raw.githubusercontent.com/deividcomsono/Obsidian/master/addons/SaveManager.lua"
+}
 local XUAN_ICON_ASSET = 108980322155893
 
 local Players = game:GetService("Players")
 local player = Players.LocalPlayer or Players.PlayerAdded:Wait()
 
+local function safeHttpGet(urls)
+    for _, u in ipairs(urls) do
+        local ok, res = pcall(function() return game:HttpGet(u) end)
+        if ok and type(res) == "string" and #res > 500 and not res:find("400: Bad Request") and not res:find("404: Not Found") and not res:find("<!DOCTYPE html>") then
+            return res
+        end
+    end
+    error("XUAN Obsidian: Failed to fetch component from all mirrors!")
+end
+
 local function loadModifiedLibrary()
     local playerGui = player:WaitForChild("PlayerGui")
-    local source = game:HttpGet(OBSIDIAN_URL)
+    local source = safeHttpGet(OBSIDIAN_URLS)
 
     source = source:gsub(
         'gethui%s*%([^%)]*%)',
@@ -581,8 +603,8 @@ local function applyXuanWindowStyle(Library, Window, windowInfo)
 end
 
 local Library = loadModifiedLibrary()
-local ThemeManager = assert(loadstring(game:HttpGet(THEME_URL)), "XUAN ThemeManager loadstring failed")()
-local SaveManager = assert(loadstring(game:HttpGet(SAVE_URL)), "XUAN SaveManager loadstring failed")()
+local ThemeManager = assert(loadstring(safeHttpGet(THEME_URLS)), "XUAN ThemeManager loadstring failed")()
+local SaveManager = assert(loadstring(safeHttpGet(SAVE_URLS)), "XUAN SaveManager loadstring failed")()
 
 -- Set Default Theme to Soft Girl Pink
 local PINK_SCHEME = {
